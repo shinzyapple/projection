@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lumina Pro - Professional Projection Mapping</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="dark-theme">
+    <div id="app">
+      <header class="app-header">
+        <div class="logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+          <h1>Lumina Pro</h1>
+        </div>
+        <div class="controls">
+          <button id="btn-project" class="btn primary active" title="調整モード/投影モード切替">
+            <span class="icon">🔍</span> 調整モード
+          </button>
+          <button id="btn-capture-screen" class="btn secondary">
+            <span class="icon">🖥️</span> キャプチャ開始
+          </button>
+          <button id="btn-open-output" class="btn secondary">
+            <span class="icon">📽️</span> 出力
+          </button>
+          <button id="btn-copy-url" class="btn secondary small" title="出力URLをコピー">
+            <span class="icon">🔗</span> URL
+          </button>
+        </div>
+      </header>
+
+      <main class="app-body">
+        <aside class="side-panel left">
+          <section class="mapping-list-section">
+            <div class="section-header">
+              <h2>レイヤー一覧</h2>
+              <button id="btn-add-area" class="btn-icon">
+                <span class="icon">➕</span>
+              </button>
+            </div>
+            <div id="mapping-layers" class="layers-container">
+              <!-- Dynamically populated -->
+            </div>
+          </section>
+
+          <section id="area-settings" class="settings-section hidden">
+            <div class="section-header">
+              <h2>レイヤー設定</h2>
+            </div>
+            <div class="setting-group">
+              <label>ソース</label>
+              <div class="toggle-group mb-xs">
+                <button data-source-type="capture" class="source-type-toggle active">キャプチャ</button>
+                <button data-source-type="file" class="source-type-toggle">ファイル</button>
+              </div>
+              <div id="file-source-controls" class="source-controls hidden">
+                <button id="btn-set-source" class="btn secondary small">ファイルを選択</button>
+                <input type="file" id="file-input" accept="video/*,image/*" class="hidden" />
+                <span id="source-name" class="source-info">未選択</span>
+              </div>
+            </div>
+            <div class="setting-group">
+              <label>形状</label>
+              <div class="toggle-group">
+                <button data-shape="rect" class="shape-toggle active">四角</button>
+                <button data-shape="circle" class="shape-toggle">丸</button>
+              </div>
+            </div>
+            <div class="setting-group">
+              <label>不透明度</label>
+              <div class="flex-row">
+                <input type="range" id="opacity-slider" min="0" max="1" step="0.01" value="1" />
+                <button id="btn-toggle-visible" class="btn-icon" title="表示/非表示">
+                  <span class="icon">👁️</span>
+                </button>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <button id="btn-delete-area" class="btn danger">レイヤー削除</button>
+            </div>
+          </section>
+        </aside>
+
+        <section class="canvas-workspace">
+          <div class="canvas-container">
+            <canvas id="control-canvas"></canvas>
+            <div class="canvas-overlay"></div>
+          </div>
+          <div class="workspace-info">
+            <span>プレビュー画面 (PC表示)</span>
+            <span id="status-info">Ready</span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <p>&copy; 2026 Lumina Pro - Cinematic Projection mapping tool</p>
+      </footer>
+    </div>
+    
+    <video id="input-video" playsinline style="display:none"></video>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
