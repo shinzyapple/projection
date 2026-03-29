@@ -31,11 +31,18 @@ class MappingArea {
 
 class ProjectionApp {
   constructor() {
+    // Generate or load unique session ID to avoid clashes with other users
+    this.sessionId = localStorage.getItem('lumina-pro-session-id');
+    if (!this.sessionId) {
+      this.sessionId = Math.random().toString(36).substring(2, 11);
+      localStorage.setItem('lumina-pro-session-id', this.sessionId);
+    }
+
     this.areas = [];
     this.selectedAreaId = null;
     this.stream = null;
     this.outputWindow = null;
-    this.channel = new BroadcastChannel('lumina-pro');
+    this.channel = new BroadcastChannel(`lumina-pro-${this.sessionId}`);
     
     this.canvas = document.getElementById('control-canvas');
     this.ctx = this.canvas.getContext('2d');
@@ -49,6 +56,13 @@ class ProjectionApp {
     
     // Expose for output window access
     window.projectionApp = this;
+
+    // Handle requests for initial state from output window
+    this.channel.onmessage = (e) => {
+       if (e.data && e.data.type === 'request-sync') {
+          this.sync();
+       }
+    };
   }
 
   init() {
@@ -67,9 +81,10 @@ class ProjectionApp {
     document.getElementById('btn-capture-screen').addEventListener('click', () => this.startCapture());
     document.getElementById('btn-open-output').addEventListener('click', () => this.openOutput());
     document.getElementById('btn-copy-url').addEventListener('click', () => {
-       const url = new URL('/output.html', window.location.origin).href;
-       navigator.clipboard.writeText(url).then(() => {
-          alert('出力画面のURLをコピーしたよ！プロジェクター側のブラウザで開いてね。');
+       const url = new URL('/output.html', window.location.origin);
+       url.searchParams.set('session', this.sessionId);
+       navigator.clipboard.writeText(url.href).then(() => {
+          alert('専用の出力URLをコピーしたよ！プロジェクター側のブラウザで開いてね。');
        });
     });
     document.getElementById('btn-add-area').addEventListener('click', () => this.addArea());
@@ -150,7 +165,7 @@ class ProjectionApp {
     const url = URL.createObjectURL(file);
     const type = file.type.startsWith('video/') ? 'video' : 'image';
     
-    area.source = { type, url, name: file.name };
+    area.source = { type, url, name: file.name, file: file };
     
     // Create side media element
     let el;
@@ -223,7 +238,7 @@ class ProjectionApp {
   openOutput() {
     const w = screen.width;
     const h = screen.height;
-    this.outputWindow = window.open('/output.html', 'LuminaOutput', `width=${w},height=${h},menubar=no,toolbar=no,location=no,status=no`);
+    this.outputWindow = window.open(`/output.html?session=${this.sessionId}`, 'LuminaOutput', `width=${w},height=${h},menubar=no,toolbar=no,location=no,status=no`);
     
     // Sync state immediately when child opens
     setTimeout(() => this.sync(), 1000);
@@ -343,27 +358,31 @@ class ProjectionApp {
   }
 
   sync() {
+    const areasData = this.areas.map(a => ({
+      id: a.id,
+      shape: a.shape,
+      opacity: a.opacity,
+      points: a.points,
+      sourceMode: a.sourceMode,
+      hasSource: !!a.source,
+      sourceType: a.source ? a.source.type : null,
+      sourceUrl: a.source ? a.source.url : null,
+      sourceFile: a.source ? a.source.file : null, // Transfer File object
+      visible: a.visible
+    }));
+
     const data = {
-      areas: this.areas.map(a => ({
-        id: a.id,
-        shape: a.shape,
-        opacity: a.opacity,
-        points: a.points,
-        sourceMode: a.sourceMode,
-        hasSource: !!a.source,
-        sourceType: a.source ? a.source.type : null,
-        sourceUrl: a.source ? a.source.url : null,
-        visible: a.visible
-      })),
+      areas: areasData,
       hasStream: !!this.stream,
       showGrid: this.showGrid
     };
     
-    // Save to local storage for persistence
-    localStorage.setItem('lumina-pro-settings', JSON.stringify(data.areas));
+    // Save to local storage for persistence (File objects will be stripped)
+    localStorage.setItem('lumina-pro-settings', JSON.stringify(areasData));
     
     this.channel.postMessage(data);
   }
+
 
   loadSettings() {
     const saved = localStorage.getItem('lumina-pro-settings');

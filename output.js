@@ -10,7 +10,12 @@ class OutputApp {
     this.canvas = document.getElementById('output-canvas');
     this.gl = this.canvas.getContext('webgl', { alpha: false, preserveDrawingBuffer: true });
     this.video = document.getElementById('input-video');
-    this.channel = new BroadcastChannel('lumina-pro');
+
+    // Get session ID from URL to match the controller
+    const urlParams = new URLSearchParams(window.location.search);
+    this.sessionId = urlParams.get('session') || 'default';
+    this.channel = new BroadcastChannel(`lumina-pro-${this.sessionId}`);
+
     this.areas = [];
     this.localMediaCache = new Map(); // url -> el
     this.showGrid = true;
@@ -114,6 +119,8 @@ class OutputApp {
 
   bindEvents() {
     this.channel.onmessage = (e) => {
+      if (e.data.type === 'request-sync') return; // Ignore our own requests or others'
+      
       this.areas = e.data.areas;
       this.showGrid = e.data.showGrid;
       
@@ -125,13 +132,33 @@ class OutputApp {
 
       // Manage local media cache
       this.areas.forEach(area => {
-         if (area.sourceMode === 'file' && area.sourceUrl) {
-            if (!this.localMediaCache.has(area.sourceUrl)) {
-               this.createLocalMedia(area);
+         if (area.sourceMode === 'file') {
+            const file = area.sourceFile;
+            const remoteUrl = area.sourceUrl;
+            
+            let el = null;
+            if (file) {
+               const fileKey = `file_${file.name}_${file.size}_${file.lastModified}`;
+               if (!this.localMediaCache.has(fileKey)) {
+                  this.createLocalMedia(area, file);
+               }
+               el = this.localMediaCache.get(fileKey);
+            } else if (remoteUrl) {
+               if (!this.localMediaCache.has(remoteUrl)) {
+                  this.createLocalMedia(area, null);
+               }
+               el = this.localMediaCache.get(remoteUrl);
+            }
+
+            if (el) {
+               this.localMediaCache.set(`area_${area.id}`, el);
             }
          }
       });
     };
+
+    // Request initial state
+    this.channel.postMessage({ type: 'request-sync' });
     
     // Check for stream every 2 seconds if not connected
     setInterval(() => {
@@ -162,11 +189,20 @@ class OutputApp {
     }
   }
 
-  createLocalMedia(area) {
-     const url = area.sourceUrl;
+  createLocalMedia(area, file) {
      const type = area.sourceType;
-     let el;
+     let url = area.sourceUrl;
+     let cacheKey = url;
+
+     if (file) {
+        // Create a local blob URL for this window's context
+        url = URL.createObjectURL(file);
+        cacheKey = `file_${file.name}_${file.size}_${file.lastModified}`;
+     }
      
+     if (!url) return;
+
+     let el;
      if (type === 'video') {
         el = document.createElement('video');
         el.src = url;
@@ -182,7 +218,11 @@ class OutputApp {
         el.crossOrigin = "anonymous";
         el.src = url;
      }
-     this.localMediaCache.set(url, el);
+
+     // Store in cache
+     this.localMediaCache.set(cacheKey, el);
+     // Also store under area ID for easier lookup in render
+     this.localMediaCache.set(`area_${area.id}`, el);
   }
 
   animate() {
@@ -205,8 +245,8 @@ class OutputApp {
       let sourceMedia = null;
       
       // 1. Try layer-specific source (Local cache in this window)
-      if (!this.showGrid && area.sourceMode === 'file' && area.sourceUrl) {
-          sourceMedia = this.localMediaCache.get(area.sourceUrl);
+      if (!this.showGrid && area.sourceMode === 'file') {
+          sourceMedia = this.localMediaCache.get(`area_${area.id}`);
       }
       
       // 2. Fallback to global screen capture
